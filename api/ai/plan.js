@@ -6,9 +6,9 @@ const CORS = {
 
 const SYSTEM = `당신은 한국어만 사용하는 전문 라이프코치입니다.
 [필수 규칙]
-1. 모든 출력은 반드시 한글로만 작성합니다.
+1. 반드시 한글로만 작성합니다. 영어 사용 절대 금지.
 2. 영어 단어도 한글 발음으로 표기합니다. (React → 리액트, AI → 인공지능)
-3. JSON 형식을 엄격히 지키며 순수 JSON만 출력합니다. 코드블록 사용 금지.
+3. 순수 JSON만 출력합니다. 코드블록(```) 사용 금지. 설명 텍스트 금지.
 
 [출력 형식]
 {
@@ -28,8 +28,9 @@ const SYSTEM = `당신은 한국어만 사용하는 전문 라이프코치입니
 [계획 규칙]
 - 각 요일 1~3개 항목
 - 사용자가 언급한 가용 요일에만 배정
-- 주말이라도 사용자 언급 없으면 평일과 동일하게 배정
-- 주차가 지날수록 난이도 점진적 상승`
+- 주말 언급 없으면 평일과 동일하게 배정
+- 주차가 지날수록 난이도 점진적 상승
+- 모든 텍스트는 반드시 한글`
 
 const FEW_SHOT = [
   { role: 'user', content: '기간: 1주\n목표: 리액트 공부\n세부사항: 매일 저녁 2시간' },
@@ -49,6 +50,19 @@ const FEW_SHOT = [
     }),
   },
 ]
+
+function sanitizeKorean(obj) {
+  if (typeof obj === 'string') {
+    return obj.replace(/[^\uAC00-\uD7A3\u1100-\u11FF\u3130-\u318F0-9\s.,!?:%~()\-]/g, '').trim()
+  }
+  if (Array.isArray(obj)) return obj.map(sanitizeKorean)
+  if (obj && typeof obj === 'object') {
+    const result = {}
+    for (const [k, v] of Object.entries(obj)) result[k] = sanitizeKorean(v)
+    return result
+  }
+  return obj
+}
 
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).setHeaders(CORS).end()
@@ -87,7 +101,8 @@ export default async function handler(req, res) {
   const clean = text.replace(/```json|```/g, '').trim()
 
   try {
-    return res.status(200).json(JSON.parse(clean))
+    const parsed = JSON.parse(clean)
+    return res.status(200).json(sanitizeKorean(parsed))
   } catch {
     return res.status(502).json({ error: 'AI 응답 파싱 오류' })
   }
